@@ -7,5 +7,4 @@ transformers
 torch
 requests
 opencv-python-headless
-tensorflow==2.15.0
 tf-keras
