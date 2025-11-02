@@ -7,7 +7,5 @@ transformers
 torch
 requests
 opencv-python-headless
-
-# ✅ Fix DeepFace + TensorFlow compatibility
 tensorflow==2.15.0
 tf-keras
