@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>😎 Emotion & Stress Detection</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(to bottom right, #001f3f, #003366, #001122);
+      color: #fff;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+      text-align: center;
+    }
+    h1 {
+      color: #00e6ff;
+      text-shadow: 0 0 8px #00ffff;
+    }
+    #video {
+      border: 2px solid #00e6ff;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+    }
+    .row {
+      display: flex;
+      gap: 30px;
+      margin-top: 25px;
+      align-items: flex-start;
+      justify-content: space-around;
+      flex-wrap: wrap;
+    }
+    .col {
+      flex: 1;
+      min-width: 300px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+    }
+    button {
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      background-color: #00e6ff;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s ease-in-out;
+    }
+    button:hover {
+      background-color: #00ffff;
+      transform: scale(1.05);
+    }
+    textarea {
+      width: 100%;
+      border-radius: 8px;
+      border: none;
+      padding: 10px;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+    }
+    #results, #faceResult, #textResult {
+      margin-top: 10px;
+      text-align: left;
+    }
+    .score {
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎭 Emotion & Stress Detection System</h1>
+
+  <div class="row">
+    <div class="col">
+      <h2>📸 Face Emotion</h2>
+      <video id="video" width="320" height="240" autoplay></video>
+      <div style="margin-top:12px;">
+        <button id="captureBtn">Capture & Analyze Face</button>
+      </div>
+      <div id="faceResult"></div>
+    </div>
+
+    <div class="col">
+      <h2>💬 Text Emotion</h2>
+      <textarea id="textInput" rows="7" placeholder="Type something like — 'I feel great today!'"></textarea>
+      <div style="margin-top:12px;">
+        <button id="analyzeTextBtn">Analyze Text Emotion</button>
+      </div>
+      <div id="textResult"></div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const captureBtn = document.getElementById('captureBtn');
+    const faceResult = document.getElementById('faceResult');
+    const analyzeTextBtn = document.getElementById('analyzeTextBtn');
+    const textInput = document.getElementById('textInput');
+    const textResult = document.getElementById('textResult');
+    const BACKEND = "http://127.0.0.1:8000";
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = stream;
+      } catch (err) {
+        console.error("Camera error:", err);
+        alert("Could not access camera.");
+      }
+    }
+    startCamera();
+
+    // 🧠 Face emotion detection
+    captureBtn.addEventListener('click', async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 240;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(async (blob) => {
+        const fd = new FormData();
+        fd.append('file', blob, 'capture.jpg');
+
+        faceResult.innerHTML = "<b>Analyzing face...</b>";
+
+        try {
+          const resp = await fetch(`${BACKEND}/predict_face`, {
+            method: "POST",
+            body: fd
+          });
+          const data = await resp.json();
+          if (data.error) {
+            faceResult.innerHTML = `<b>Error:</b> ${data.error}`;
+            return;
+          }
+          faceResult.innerHTML = `
+            <b>Emotion:</b> ${data.dominant_emotion}<br/>
+            <b>Stress Level:</b> ${data.stress_level}<br/>
+            <b>Suggestion:</b> ${data.suggestion}<br/>
+            <div id="faceScores"><h4>Scores:</h4></div>
+          `;
+          const div = document.getElementById('faceScores');
+          Object.entries(data.scores).forEach(([k,v]) => {
+            const p = document.createElement('div');
+            p.textContent = `${k}: ${Math.round(v*100)/100}`;
+            div.appendChild(p);
+          });
+        } catch (err) {
+          faceResult.innerHTML = "Request failed.";
+        }
+      }, 'image/jpeg', 0.9);
+    });
+
+    // 💬 Text emotion detection
+    analyzeTextBtn.addEventListener('click', async () => {
+      const text = textInput.value.trim();
+      if (!text) return alert("Please type something first!");
+      textResult.innerHTML = "<b>Analyzing...</b>";
+
+      try {
+        const resp = await fetch(`${BACKEND}/predict_text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        const data = await resp.json();
+        if (data.error) {
+          textResult.innerHTML = data.error;
+          return;
+        }
+        textResult.innerHTML = `
+          <b>Emotion:</b> ${data.dominant_emotion}<br/>
+          <b>Suggestion:</b> ${data.suggestion}<br/>
+          <div id="textScores"><h4>Scores:</h4></div>
+        `;
+        const div = document.getElementById('textScores');
+        Object.entries(data.scores).forEach(([k,v]) => {
+          const p = document.createElement('div');
+          p.textContent = `${k}: ${Math.round(v*100)/100}`;
+          div.appendChild(p);
+        });
+      } catch (err) {
+        textResult.innerHTML = "Error fetching data.";
+      }
+    });
+  </script>
+</body>
+</html>
