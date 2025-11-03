@@ -6,7 +6,9 @@ import cv2
 import numpy as np
 import uvicorn
 import traceback
+import os
 
+# 🎯 Create FastAPI app
 app = FastAPI(
     title="Emotion Detection API 😎",
     description="Detects facial emotions and stress levels, and gives helpful suggestions 💬",
@@ -16,7 +18,7 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# ✅ Allow all origins (for testing)
+# ✅ Allow all origins (for testing or frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -106,7 +108,6 @@ async def predict_text(data: dict):
     scores = {}
     for item in result:
         if isinstance(item, dict) and "label" in item and "score" in item:
-            # ✅ Convert numpy.float32 → Python float
             scores[str(item["label"])] = float(item["score"])
 
     dominant_emotion = max(scores, key=scores.get) if scores else "unknown"
@@ -129,6 +130,7 @@ async def predict_text(data: dict):
     }
 
 
-# 🚀 RUN
+# 🚀 RUN APP (Render-compatible)
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))  # ✅ Render will auto-assign this
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
