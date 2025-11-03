@@ -7,18 +7,19 @@ import numpy as np
 import uvicorn
 import traceback
 import os
+import threading
 
 # 🎯 Create FastAPI app
 app = FastAPI(
     title="Emotion Detection API 😎",
     description="Detects facial emotions and stress levels, and gives helpful suggestions 💬",
-    version="1.0.4",
+    version="1.0.5",
     docs_url="/docs",
     redoc_url=None,
     openapi_url="/openapi.json"
 )
 
-# ✅ Allow all origins (for testing or frontend)
+# ✅ Allow all origins (for frontend testing)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,16 +28,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 Load the text emotion model
-print("🚀 Loading emotion model (this may take a few seconds)...")
-text_emotion = pipeline(
-    "text-classification",
-    model="j-hartmann/emotion-english-distilroberta-base",
-    top_k=None
-)
-print("✅ Text emotion model loaded successfully!")
+# Global model variable
+text_emotion = None
+face_model_ready = False
 
+# 🔄 Load models in background
+def preload_models():
+    global text_emotion, face_model_ready
+    try:
+        print("🚀 Preloading models in background...")
+        from deepface.basemodels import VGGFace
+        _ = DeepFace.build_model("Emotion")
+        text_emotion = pipeline(
+            "text-classification",
+            model="j-hartmann/emotion-english-distilroberta-base",
+            top_k=None
+        )
+        face_model_ready = True
+        print("✅ Models preloaded successfully!")
+    except Exception as e:
+        print("❌ Model preload failed:", str(e))
+        traceback.print_exc()
 
+# 👋 Root endpoint
 @app.get("/")
 def root():
     return {"message": "😎 Emotion & Stress Detection backend is running successfully!"}
@@ -90,6 +104,11 @@ async def predict_face(file: UploadFile = File(...)):
 # ✍️ TEXT EMOTION DETECTION
 @app.post("/predict_text")
 async def predict_text(data: dict):
+    global text_emotion
+
+    if text_emotion is None:
+        return {"success": False, "error": "Model is still loading. Try again in a few seconds."}
+
     text = data.get("text", "").strip()
     if not text:
         return {"success": False, "error": "Please enter some text."}
@@ -132,5 +151,6 @@ async def predict_text(data: dict):
 
 # 🚀 RUN APP (Render-compatible)
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # ✅ Render will auto-assign this
+    threading.Thread(target=preload_models).start()  # ✅ Load models after server starts
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
