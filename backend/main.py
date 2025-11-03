@@ -13,13 +13,13 @@ import threading
 app = FastAPI(
     title="Emotion Detection API 😎",
     description="Detects facial emotions and stress levels, and gives helpful suggestions 💬",
-    version="1.0.5",
+    version="1.0.6",
     docs_url="/docs",
     redoc_url=None,
     openapi_url="/openapi.json"
 )
 
-# ✅ Allow all origins (for frontend testing)
+# ✅ Allow all origins (for frontend testing or production flexibility)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global model variable
+# Global model variables
 text_emotion = None
 face_model_ready = False
 
@@ -36,24 +36,39 @@ face_model_ready = False
 def preload_models():
     global text_emotion, face_model_ready
     try:
-        print("🚀 Preloading models in background...")
-        from deepface.basemodels import VGGFace
-        _ = DeepFace.build_model("Emotion")
+        print("🚀 Preloading DeepFace and Transformer models in background...")
+
+        # Preload DeepFace Emotion model
+        DeepFace.build_model("Emotion")
+        face_model_ready = True
+        print("✅ DeepFace model loaded successfully!")
+
+        # Preload HuggingFace emotion model
         text_emotion = pipeline(
             "text-classification",
             model="j-hartmann/emotion-english-distilroberta-base",
             top_k=None
         )
-        face_model_ready = True
-        print("✅ Models preloaded successfully!")
+        print("✅ Text emotion model loaded successfully!")
+
     except Exception as e:
         print("❌ Model preload failed:", str(e))
         traceback.print_exc()
+
 
 # 👋 Root endpoint
 @app.get("/")
 def root():
     return {"message": "😎 Emotion & Stress Detection backend is running successfully!"}
+
+
+# 🧠 Status endpoint to check model readiness
+@app.get("/status")
+def status():
+    return {
+        "text_model_loaded": text_emotion is not None,
+        "face_model_loaded": face_model_ready
+    }
 
 
 # 🧩 FACE EMOTION DETECTION
@@ -151,6 +166,7 @@ async def predict_text(data: dict):
 
 # 🚀 RUN APP (Render-compatible)
 if __name__ == "__main__":
-    threading.Thread(target=preload_models).start()  # ✅ Load models after server starts
+    print("✅ FastAPI started — waiting for model preload in background...")
+    threading.Thread(target=preload_models, daemon=True).start()  # ✅ Async model load
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
