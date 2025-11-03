@@ -5,6 +5,9 @@ numpy
 deepface
 transformers
 torch
+tensorflow
+tf-keras
 requests
 opencv-python-headless
-tf-keras
+python-multipart
+flask-cors
