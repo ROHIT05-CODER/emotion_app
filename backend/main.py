@@ -168,5 +168,5 @@ async def predict_text(data: dict):
 if __name__ == "__main__":
     print("✅ FastAPI started — waiting for model preload in background...")
     threading.Thread(target=preload_models, daemon=True).start()  # ✅ Async model load
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 10000))  # ✅ dynamic port for Render
+    uvicorn.run(app, host="0.0.0.0", port=port)
